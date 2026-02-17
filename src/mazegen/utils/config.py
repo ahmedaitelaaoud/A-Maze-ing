@@ -74,6 +74,24 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
         clean_settings["ENTRY"] = (int(entry_part[0]), int(entry_part[1]))
         clean_settings["EXIT"] = (int(exit_part[0]), int(exit_part[1]))
 
+        entry_x, entry_y = clean_settings["ENTRY"]
+        exit_x, exit_y = clean_settings["EXIT"]
+        w, h = clean_settings["WIDTH"], clean_settings["HEIGHT"]
+
+        # 1. Check if ENTRY is within bounds
+        if not (0 <= entry_x < w and 0 <= entry_y < h):
+            print(f"Error: ENTRY {entry_x, entry_y} is out of bounds for {w}x{h} maze.", file=sys.stderr)
+            sys.exit(1)
+
+        # 2. Check if EXIT is within bounds
+        if not (0 <= exit_x < w and 0 <= exit_y < h):
+            print(f"Error: ENTRY {exit_x, exit_y} is out of bounds for {w}x{h} maze.", file=sys.stderr)
+            sys.exit(1)
+
+        # 3. Check if ENTRY and EXIT are different
+        if (entry_x, entry_y) == (exit_x, exit_y):
+            print("Error: ENTRY and EXIT must be different coordinates.", file=sys.stderr)
+            sys.exit(1)
     except (ValueError, IndexError):
         print("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)", file=sys.stderr)
         sys.exit(1)
