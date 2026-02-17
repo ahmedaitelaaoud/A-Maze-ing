@@ -68,3 +68,6 @@ class MazeGenerator:
                 stack.pop()
 
         return self.grid
+
+    def _42_pattern(self, visited_set):
+        pass
