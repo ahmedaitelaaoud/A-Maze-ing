@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import Optional, List, Set, Tuple
 
 class MazeGenerator:
@@ -25,6 +26,29 @@ class MazeGenerator:
         self.grid = [[self.ALL_WALLS for _ in range(width)] for _ in range(height)]
         print(self.grid)
 
+    def _get_42_pattern_cells(self) -> Set[Tuple[int, int]]:
+        """Calculates and returns the coordinates of the 42 pattern."""
+        pattern_cells: Set[Tuple[int, int]] = set()
+
+        # Subject requirement: Print error if too small
+        if self.width < 9 or self.height < 7:
+            print("Error: Maze too small for '42' pattern", file=sys.stderr)
+            return pattern_cells
+
+        start_x = (self.width - 7) // 2
+        start_y = (self.height - 5) // 2
+
+        pattern_offsets = [
+            (0,0), (2,0), (0,1), (2,1), (0,2), (1,2), (2,2), (2,3), (2,4),
+            (4,0), (5,0), (6,0), (6,1), (4,2), (5,2), (6,2), (4,3), (4,4), (5,4), (6,4)
+        ]
+
+        for dx, dy in pattern_offsets:
+            x, y = start_x + dx, start_y + dy
+            pattern_cells.add((x, y))
+
+        return pattern_cells
+
     def generate(self) -> List[list[int]]:
         """
         Carve a perfect maze using the iterative Recursive Backtracker.
@@ -37,8 +61,10 @@ class MazeGenerator:
         stack: List[Tuple[int, int]] = []
 
         start = (0, 0)
-        visited.add(start)
-        stack.append(start)
+        # Failsafe: Ensure (0,0) isn't accidentally part of the 42 pattern in tiny mazes
+        if start not in visited:
+            visited.add(start)
+            stack.append(start)
         while stack:
             # First, I look at my current coordinates (cx, cy) by checking the very last step in my GPS memory (stack[-1])
             cx, cy = stack[-1]
@@ -68,6 +94,3 @@ class MazeGenerator:
                 stack.pop()
 
         return self.grid
-
-    def _42_pattern(self, visited_set):
-        pass
