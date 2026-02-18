@@ -15,7 +15,7 @@ class MazeData:
 
     def get_walls(self, x: int, y: int) -> int:
         """
-        Safely gets the walls at (x, y). 
+        Safely gets the walls at (x, y).
         Returns 15 (solid block) if outside the map.
         """
         if 0 <= x < self.width and 0 <= y < self.height:
