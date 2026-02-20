@@ -7,7 +7,10 @@ class MazeGenerator:
     A reusable class for generating perfect mazes.
     """
     # 1. Bitmask Constants (Power of 2)
-    N, E, S, W = 1, 2, 4, 8
+    N = 1
+    E = 2
+    S = 4
+    W = 8
     ALL_WALLS = 15 # Binary 1111: all four walls are closed.
     # GPS Dictionary: (dx, dy, opposite_wall)
     DIRECTIONS = {
@@ -24,10 +27,16 @@ class MazeGenerator:
         self.seed = seed
         # Initialize grid with all walls closed for every cell.
         self.grid = [[self.ALL_WALLS for _ in range(width)] for _ in range(height)]
-        print(self.grid)
+        # Pre-calculate the 42 pattern -> isolated
+        self.patern_cells = self._get_42_pattern_cells()
 
     def _get_42_pattern_cells(self) -> Set[Tuple[int, int]]:
-        """Calculates and returns the coordinates of the 42 pattern."""
+        """
+        Calculates the coordinates of the '42' pattern to be placed in the center.
+
+        Returns:
+            set[tuple[int, int]]: A set of (x, y) coordinates representing the pattern.
+        """
         pattern_cells: Set[Tuple[int, int]] = set()
 
         # Subject requirement: Print error if too small
@@ -52,19 +61,35 @@ class MazeGenerator:
     def generate(self) -> List[list[int]]:
         """
         Carve a perfect maze using the iterative Recursive Backtracker.
+        The '42' pattern blocks are treated as pre-visited walls.
+
+        Returns:
+            list[list[int]]: The generated 2D grid containing wall bitmasks.
         """
         # Set the seed for reproducibility
         if self.seed is not None:
             random.seed(self.seed)
 
-        visited: Set[Tuple[int, int]] = set()
+        # Pre-fill 'visited' with the 42 pattern.
+        # This prevents the algorithm from carving into these cells.
+        visited: Set[Tuple[int, int]] = set(self.patern_cells)
         stack: List[Tuple[int, int]] = []
 
-        start = (0, 0)
-        # Failsafe: Ensure (0,0) isn't accidentally part of the 42 pattern in tiny mazes
-        if start not in visited:
-            visited.add(start)
-            stack.append(start)
+        # (0,0) is usually safe, but searching for the first unvisited cell is foolproof.
+        start_x, start_y = 0, 0
+        for y in range(self.height):
+            for x in range(self.width):
+                if (x, y) not in visited:
+                    start_x, start_y = x, y
+                    break
+            else:
+                continue
+            break
+
+        start = (start_x, start_y)
+        visited.add(start)
+        stack.append(start)
+
         while stack:
             # First, I look at my current coordinates (cx, cy) by checking the very last step in my GPS memory (stack[-1])
             cx, cy = stack[-1]
