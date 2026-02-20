@@ -1,4 +1,3 @@
-import sys
 from typing import Dict, Any
 
 
@@ -19,9 +18,12 @@ def parse_config(filepath: str) -> Dict[str, str]:
             for line in file:
                 # Clean it
                 clean_line = line.strip()
-                # Skip empty line
-                if not clean_line or '=' not in clean_line:
+                # Skip empty line and comments
+                if not clean_line or clean_line.startswith('#'):
                     continue
+
+                if '=' not in clean_line:
+                    raise ValueError(f"Invalid format (missing '='): {clean_line}")
                 # Split by "="
                 splitted = clean_line.split("=", 1)
                 key = splitted[0].strip()
@@ -31,8 +33,7 @@ def parse_config(filepath: str) -> Dict[str, str]:
         return settings
 
     except FileNotFoundError:
-        print(f"File not found at '{filepath}'", file=sys.stderr)
-        sys.exit(1)
+        print(f"Configuration file not found at '{filepath}'")
 
 def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
     """
@@ -49,62 +50,51 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
     # Check if all setting in
     for key in mandatory_keys:
         if key not in raw_settings:
-            print(f"Error: Missing mandatory setting '{key}", file=sys.stderr)
-            sys.exit(1)
+            raise ValueError(f"Error: Missing mandatory setting '{key}")
 
-    # Handling Errors
+    # 1. Validate Dimensions
     try:
         clean_settings["WIDTH"] = int(raw_settings["WIDTH"])
         clean_settings["HEIGHT"] = int(raw_settings["HEIGHT"])
+        w, h = clean_settings["WIDTH"], clean_settings["HEIGHT"]
         # Handle HEIGHT and WIDTH must be 3x3 and more
-        if clean_settings["WIDTH"] < 3 or clean_settings["HEIGHT"] < 3:
-            print("Error: WIDH and HEIGHT must be at least 3", file=sys.stderr)
-            sys.exit(1)
+        if w < 3 or h < 3:
+            raise ValueError("Error: WIDH and HEIGHT must be at least 3")
 
     except ValueError as e:
-        print("Error: WIDTH and HEIGHT must be valid numbers!", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("Error: WIDTH and HEIGHT must be valid numbers!")
 
-    # Parse ENTRY and EXIT
+    # 2. Validate Coordinates
     try:
         # Split coordinates
         entry_part = raw_settings["ENTRY"].split(",")
         exit_part = raw_settings["EXIT"].split(",")
+
+
+        if len(entry_part) != 2 or len(exit_part) != 2:
+            raise ValueError("ENTRY and EXIT must be exactly X,Y format.")
+
         # Convert to int and put them in tuple
         clean_settings["ENTRY"] = (int(entry_part[0]), int(entry_part[1]))
         clean_settings["EXIT"] = (int(exit_part[0]), int(exit_part[1]))
 
         entry_x, entry_y = clean_settings["ENTRY"]
         exit_x, exit_y = clean_settings["EXIT"]
-        w, h = clean_settings["WIDTH"], clean_settings["HEIGHT"]
 
-        # 1. Check if ENTRY is within bounds
+
+        # Bounds checking
         if not (0 <= entry_x < w and 0 <= entry_y < h):
-            print(f"Error: ENTRY {entry_x, entry_y} is out of bounds for {w}x{h} maze.", file=sys.stderr)
-            sys.exit(1)
-
-        # 2. Check if EXIT is within bounds
+            raise ValueError(f"ENTRY ({entry_x}, {entry_y}) is out of bounds for {w}x{h} maze.")
         if not (0 <= exit_x < w and 0 <= exit_y < h):
-            print(f"Error: ENTRY {exit_x, exit_y} is out of bounds for {w}x{h} maze.", file=sys.stderr)
-            sys.exit(1)
-
-        # 3. Check if ENTRY and EXIT are different
+            raise ValueError(f"EXIT ({exit_x}, {exit_y}) is out of bounds for {w}x{h} maze.")
         if (entry_x, entry_y) == (exit_x, exit_y):
-            print("Error: ENTRY and EXIT must be different coordinates.", file=sys.stderr)
-            sys.exit(1)
+            raise ValueError("ENTRY and EXIT must be different coordinates.")
     except (ValueError, IndexError):
-        print("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)", file=sys.stderr)
-        sys.exit(1)
+        print("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)")
 
-    # 1. Handle PERFECT
+    # 3. Handle PERFECT and OUTPUT_FILE
     perfect_str = raw_settings.get("PERFECT", "True")
     clean_settings["PERFECT"] = (perfect_str.lower() == "true")
-
-    # 2. Handle OUTPUT_FILE
     clean_settings["OUTPUT_FILE"] = raw_settings.get("OUTPUT_FILE", "maze.txt")
 
     return clean_settings
-
-if __name__ == "__main__":
-    a = (parse_config("../../../default_config.txt"))
-    validate_config(a)
