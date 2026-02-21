@@ -1,5 +1,5 @@
 import sys
-from src.utils.config import parse_config, validate_config
+from src.mazegen.utils import parse_config, validate_config
 from src.mazegen import MazeGenerator
 
 def main() -> None:
