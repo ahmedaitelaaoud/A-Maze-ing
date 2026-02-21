@@ -66,7 +66,7 @@ class Pathfinder:
             for dx, dy, wall_bit, letter in directions:
 
                 # BITWISE MATH: If the result is 0, the door is OPEN
-                if (current_walls & wall_bit) == 0:
+                if (current_walls & wall_bit) != 0:
 
                     # Calculate the coordinate of the next room
                     nx, ny = cx + dx, cy + dy
