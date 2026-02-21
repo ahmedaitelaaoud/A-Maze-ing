@@ -33,9 +33,9 @@ def parse_config(filepath: str) -> Dict[str, str]:
         return settings
 
     except FileNotFoundError:
-        print(f"Configuration file not found at '{filepath}'")
+        raise FileNotFoundError(f"Configuration file not found at '{filepath}'")
 
-def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
+def validate_config(raw_settings: Dict[str, str]) -> Dict[str, Any]:
     """
     Validate and convert raw configuration strings into strict Python types.
 
@@ -50,7 +50,7 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
     # Check if all setting in
     for key in mandatory_keys:
         if key not in raw_settings:
-            raise ValueError(f"Error: Missing mandatory setting '{key}")
+            raise ValueError(f"Error: Missing mandatory setting '{key}'")
 
     # 1. Validate Dimensions
     try:
@@ -59,7 +59,9 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
         w, h = clean_settings["WIDTH"], clean_settings["HEIGHT"]
         # Handle HEIGHT and WIDTH must be 3x3 and more
         if w < 3 or h < 3:
-            raise ValueError("Error: WIDH and HEIGHT must be at least 3")
+            raise ValueError("Error: WIDH and HEIGHT must be at least 3")  # typo: WIDH
+    except ValueError as e:
+        raise ValueError("Error: WIDTH and HEIGHT must be valid numbers!")  # swallows the above!
 
     except ValueError as e:
         raise ValueError("Error: WIDTH and HEIGHT must be valid numbers!")
@@ -90,7 +92,7 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
         if (entry_x, entry_y) == (exit_x, exit_y):
             raise ValueError("ENTRY and EXIT must be different coordinates.")
     except (ValueError, IndexError):
-        print("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)")
+        raise ValueError("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)")
 
     # 3. Handle PERFECT and OUTPUT_FILE
     perfect_str = raw_settings.get("PERFECT", "True")

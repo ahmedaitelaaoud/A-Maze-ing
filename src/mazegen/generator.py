@@ -58,7 +58,7 @@ class MazeGenerator:
 
         return pattern_cells
 
-    def generate(self) -> List[list[int]]:
+    def generate(self) -> List[List[int]]:
         """
         Carve a perfect maze using the iterative Recursive Backtracker.
         The '42' pattern blocks are treated as pre-visited walls.
