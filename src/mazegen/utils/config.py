@@ -33,7 +33,7 @@ def parse_config(filepath: str) -> Dict[str, str]:
         return settings
 
     except FileNotFoundError:
-        print(f"Configuration file not found at '{filepath}'")
+        raise FileNotFoundError(f"Configuration file not found at '{filepath}'")
 
 def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
     """
@@ -90,7 +90,7 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, any]:
         if (entry_x, entry_y) == (exit_x, exit_y):
             raise ValueError("ENTRY and EXIT must be different coordinates.")
     except (ValueError, IndexError):
-        print("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)")
+        raise ValueError("Error: ENTRY and EXIT must be in format X,Y (e.g., 0,0)")
 
     # 3. Handle PERFECT and OUTPUT_FILE
     perfect_str = raw_settings.get("PERFECT", "True")
