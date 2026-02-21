@@ -22,17 +22,4 @@ class MazeData:
             return self.grid_result[y][x]
         return 15
 
-grid = [
-    [10, 20],
-    [88, 90],
-    [19, 67],
-]
 
-entry = (0, 0)
-exit = (19, 19)
-
-
-a = MazeData(grid, 20, 10, entry, exit)
-
-# a.entry = 1000
-print(a.entry)
