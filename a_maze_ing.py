@@ -9,20 +9,19 @@ import sys
 from typing import List, Tuple, Optional
 from src.mazegen.utils import parse_config, validate_config
 from src.mazegen import MazeGenerator
-from src.solver.hex_writer import write_maze_file
-from src.display import run_display
+from src.solver.hex_writer import HexWriter
+from src.solver.maze_data import MazeData
+from src.solver.pathfinder import Pathfinder
+from src.display import TerminalDisplay
+
+# from src.display import run_display
+
 
 def build_maze(
     config: dict,  # type: ignore[type-arg]
 ) -> Tuple[List[List[int]], Optional[str]]:
     """
     Instantiate MazeGenerator, generate the maze, write output file.
-
-    Args:
-        config: Validated configuration dictionary.
-
-    Returns:
-        A tuple of (grid, path_string).
     """
     seed: Optional[int] = config.get("SEED")
 
@@ -37,7 +36,13 @@ def build_maze(
     exit_pt: Tuple[int, int] = config["EXIT"]
     output_file: str = config["OUTPUT_FILE"]
 
-    path: Optional[str] = write_maze_file(grid, entry, exit_pt, output_file)
+    maze = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
+
+    pf = Pathfinder(maze)
+    path: str = pf.solve()
+
+    writer = HexWriter(maze, path, output_file)
+    writer.write()
 
     print(f"Maze written to '{output_file}'.")
     return grid, path
@@ -76,24 +81,30 @@ def main() -> None:
     _gen = _MG(width=config["WIDTH"], height=config["HEIGHT"])
     pattern_cells = _gen.patern_cells
 
-    def regenerate():  # type: ignore[return]
-        """Re-generate a fresh maze (used by the display menu option 1)."""
-        try:
-            new_grid, new_path = build_maze({**config, "SEED": None})
-            return new_grid, new_path
-        except Exception as err:
-            print(f"Re-generation error: {err}", file=sys.stderr)
-            return grid, path
+    # def regenerate():  # type: ignore[return]
+    #     """Re-generate a fresh maze (used by the display menu option 1)."""
+    #     try:
+    #         new_grid, new_path = build_maze({**config, "SEED": None})
+    #         return new_grid, new_path
+    #     except Exception as err:
+    #         print(f"Re-generation error: {err}", file=sys.stderr)
+    #         return grid, path
 
-    run_display(
-        grid=grid,
-        entry=entry,
-        exit_pt=exit_pt,
-        path=path,
-        pattern_cells=pattern_cells,
-        regenerate_callback=regenerate,
-    )
+    # run_display(
+    #     grid=grid,
+    #     entry=entry,
+    #     exit_pt=exit_pt,
+    #     path=path,
+    #     pattern_cells=pattern_cells,
+    #     regenerate_callback=regenerate,
+    # )
+    maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
 
+# 3. PASSI pattern_cells hna (Argument t-talet!)
+    test = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
 
+# 4. Render
+    test.render()
+    test.main_menu()
 if __name__ == "__main__":
     main()
