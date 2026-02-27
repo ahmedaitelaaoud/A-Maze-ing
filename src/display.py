@@ -23,22 +23,24 @@ class TerminalDisplay:
 
         self.WALL = "██"
         self.EMPTY = "  "
-        self.DOT = "\033[33m██\033[0m"
+        self.path_char = "\033[33m██\033[0m"
         self.START = "\033[32m██\033[0m"
         self.EXIT = "\033[31m██\033[0m"
+
+        self.path_is_visible = False
 
     def __random_color(self) -> tuple[str, str]:
         """Generates random ANSI color codes for walls and the 42 pattern."""
         number = random.randint(1, 4)
 
         if number == 1:
-            return "\033[32m", "\033[106m"
+            return "\033[0;31m", "\033[106m"
         elif number == 2:
-            return "\033[36m", "\033[105m"
+            return "\033[0;32m", "\033[105m"
         elif number == 3:
-            return "\033[35m", "\033[103m"
+            return "\033[0;33m", "\033[103m"
         else:
-            return "\033[33m", "\033[102m"
+            return "\033[0;34m", "\033[102m"
 
     def render(self, color_operation = False) -> None:
         try:
@@ -86,7 +88,7 @@ class TerminalDisplay:
             print(f"\033[{(self.maze.height * 3) + 2};1H")
         except BaseException:
             os.system('clear')
-            print("Ctr + C Detected!")
+            print("Generation Corrupted!")
             exit()
 
     def _draw_at_canvas(self, cx: int, cy: int, char: str) -> None:
@@ -105,36 +107,45 @@ class TerminalDisplay:
         bg_e = self.bg_42_pass if (xx, xy) in self.pattern_cells else ""
         self._draw_at_canvas(xx * 3 + 1, xy * 3 + 1, f"{bg_e}{self.EXIT}{self.c_reset}")
 
-    # Path logic... (nqitat b lawnhom)
+    def show_path(self):
+        if self.path:
+            if self.path_is_visible == False:
+                char_to_draw = self.path_char
+                self.path_is_visible = True
+            else:
+                char_to_draw = self.EMPTY
+                self.path_is_visible = False
 
-    def main_menu(self):
+            cx, cy = self.maze.entry
 
-        try:
-            while True:
-                print("==A-Maze-ing== by: aait-ela/yrabhi")
-                print("1. Re-generate a new maze")
-                print("2. Show/hide path from entry to exit")
-                print("3. Rotate maze colors")
-                print("4. Quit")
+            if (cx, cy) != self.maze.entry and (cx, cy) != self.maze.exit:
+                self._draw_at_canvas(cx * 3 + 1, cy * 3 + 1, char_to_draw)
 
-                choice = input("Choice (1-4): ")
+            for direction in self.path:
+                sx, sy = cx * 3, cy * 3
 
-                try:
-                    choice = int(choice)
-                    if choice < 1 or choice > 4:
-                        print("Invalid input try again!")
-                        continue
-                except ValueError:
-                    print("Invalid input try again!")
-                    continue
-                if choice == 1:
-                    os.system('clear')
-                    self.render(False)
-                elif choice == 2:
-                    pass
-                elif choice == 3:
-                    self.render(True)
-                elif choice == 4:
-                    print("Goodbye!")
-                    break
-        except BaseException: ...
+                if direction == "E":
+                    self._draw_at_canvas(sx + 2, sy + 1, char_to_draw)
+                    self._draw_at_canvas(sx + 3, sy + 1, char_to_draw)
+                    cx += 1
+                elif direction == "S":
+                    self._draw_at_canvas(sx + 1, sy + 2, char_to_draw)
+                    self._draw_at_canvas(sx + 1, sy + 3, char_to_draw)
+                    cy += 1
+                elif direction == "W":
+                    self._draw_at_canvas(sx, sy + 1, char_to_draw)
+                    self._draw_at_canvas(sx - 1, sy + 1, char_to_draw)
+                    cx -= 1
+                elif direction == "N":
+                    self._draw_at_canvas(sx + 1, sy, char_to_draw)
+                    self._draw_at_canvas(sx + 1, sy - 1, char_to_draw)
+                    cy -= 1
+
+                time.sleep(0.01)
+
+
+                if (cx, cy) != self.maze.entry and (cx, cy) != self.maze.exit:
+                    self._draw_at_canvas(cx * 3 + 1, cy * 3 + 1, char_to_draw)
+
+        self._draw_special_points()
+        print(f"\033[{(self.maze.height * 3) + 2};1H")

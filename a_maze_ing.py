@@ -6,6 +6,7 @@ Usage:
 """
 
 import sys
+import os
 from typing import List, Tuple, Optional
 from src.mazegen.utils import parse_config, validate_config
 from src.mazegen import MazeGenerator
@@ -13,8 +14,6 @@ from src.solver.hex_writer import HexWriter
 from src.solver.maze_data import MazeData
 from src.solver.pathfinder import Pathfinder
 from src.display import TerminalDisplay
-
-# from src.display import run_display
 
 
 def build_maze(
@@ -69,42 +68,67 @@ def main() -> None:
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
 
-    # Initial generation
     try:
         grid, path = build_maze(config)
     except Exception as e:
         print(f"Generation error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Grab the 42 pattern cells for display highlighting
     from src.mazegen.generator import MazeGenerator as _MG
     _gen = _MG(width=config["WIDTH"], height=config["HEIGHT"])
     pattern_cells = _gen.patern_cells
 
-    # def regenerate():  # type: ignore[return]
-    #     """Re-generate a fresh maze (used by the display menu option 1)."""
-    #     try:
-    #         new_grid, new_path = build_maze({**config, "SEED": None})
-    #         return new_grid, new_path
-    #     except Exception as err:
-    #         print(f"Re-generation error: {err}", file=sys.stderr)
-    #         return grid, path
-
-    # run_display(
-    #     grid=grid,
-    #     entry=entry,
-    #     exit_pt=exit_pt,
-    #     path=path,
-    #     pattern_cells=pattern_cells,
-    #     regenerate_callback=regenerate,
-    # )
     maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
-
-# 3. PASSI pattern_cells hna (Argument t-talet!)
     test = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
 
-# 4. Render
     test.render()
-    test.main_menu()
+    # test.main_menu()
+
+    try:
+            while True:
+                print("==A-Maze-ing==")
+                print("1. Re-generate a new maze")
+                print("2. Show/hide path from entry to exit")
+                print("3. Rotate maze colors")
+                print("4. Quit")
+
+                choice = input("Choice (1-4): ")
+
+                try:
+                    choice = int(choice)
+                    if choice < 1 or choice > 4:
+                        print("Invalid input try again!")
+                        continue
+                except ValueError:
+                    print("Invalid input try again!")
+                    continue
+                if choice == 1:
+                    os.system('clear')
+
+
+                    try:
+                        grid, path = build_maze(config)
+                    except Exception as e:
+                        print(f"Generation error: {e}", file=sys.stderr)
+                        sys.exit(1)
+
+                    from src.mazegen.generator import MazeGenerator as _MG
+                    _gen = _MG(width=config["WIDTH"], height=config["HEIGHT"])
+                    pattern_cells = _gen.patern_cells
+
+                    maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
+                    test = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
+                    test.render()
+
+                elif choice == 2:
+                    test.show_path()
+                elif choice == 3:
+                    test.render(True)
+                elif choice == 4:
+                    print("Goodbye!")
+                    break
+    except BaseException:
+        pass
+
 if __name__ == "__main__":
     main()

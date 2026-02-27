@@ -46,7 +46,7 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, Any]:
         Dict[str, Any]: A clean dictionary with proper ints, tuples, and bools.
     """
     clean_settings = {}
-    mandatory_keys = ["WIDTH", "HEIGHT", "ENTRY", "EXIT"]
+    mandatory_keys = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "SEED"]
     # Check if all setting in
     for key in mandatory_keys:
         if key not in raw_settings:
@@ -61,10 +61,8 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, Any]:
         if w < 3 or h < 3:
             raise ValueError("Error: WIDH and HEIGHT must be at least 3")  # typo: WIDH
     except ValueError as e:
-        raise ValueError("Error: WIDTH and HEIGHT must be valid numbers!")  # swallows the above!
-
-    except ValueError as e:
-        raise ValueError("Error: WIDTH and HEIGHT must be valid numbers!")
+            print(e)
+            exit(1)
 
     # 2. Validate Coordinates
     try:
