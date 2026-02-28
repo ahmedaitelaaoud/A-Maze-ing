@@ -48,9 +48,11 @@ class TerminalDisplay:
 
             if color_operation:
                 wall_color, self.bg_42_pass = self.__random_color()
+
             else:
                 wall_color = "\033[37m"
                 self.bg_42_pass = "\033[104m"
+
 
             self.WALL = f"{wall_color}██{self.c_reset}"
 
@@ -86,6 +88,8 @@ class TerminalDisplay:
 
             self._draw_special_points()
             print(f"\033[{(self.maze.height * 3) + 2};1H")
+            if self.path_is_visible == True:
+                    self.show_path(True)
         except BaseException:
             os.system('clear')
             print("Generation Corrupted!")
@@ -107,7 +111,7 @@ class TerminalDisplay:
         bg_e = self.bg_42_pass if (xx, xy) in self.pattern_cells else ""
         self._draw_at_canvas(xx * 3 + 1, xy * 3 + 1, f"{bg_e}{self.EXIT}{self.c_reset}")
 
-    def show_path(self):
+    def show_path(self, flag=False):
         if self.path:
             if self.path_is_visible == False:
                 char_to_draw = self.path_char
@@ -141,7 +145,8 @@ class TerminalDisplay:
                     self._draw_at_canvas(sx + 1, sy - 1, char_to_draw)
                     cy -= 1
 
-                time.sleep(0.01)
+                if flag == False:
+                    time.sleep(0.01)
 
 
                 if (cx, cy) != self.maze.entry and (cx, cy) != self.maze.exit:

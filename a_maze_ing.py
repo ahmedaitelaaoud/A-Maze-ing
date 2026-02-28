@@ -7,9 +7,11 @@ Usage:
 
 import sys
 import os
-from typing import List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+# Assuming your config.py is saved as src/mazegen/utils.py based on your imports
 from src.mazegen.utils import parse_config, validate_config
-from src.mazegen import MazeGenerator
+from src.mazegen.generator import MazeGenerator
 from src.solver.hex_writer import HexWriter
 from src.solver.maze_data import MazeData
 from src.solver.pathfinder import Pathfinder
@@ -17,13 +19,14 @@ from src.display import TerminalDisplay
 
 
 def build_maze(
-    config: dict,  # type: ignore[type-arg]
-) -> Tuple[List[List[int]], Optional[str]]:
+    config: Dict[str, Any],
+) -> Tuple[List[List[int]], str, List[Tuple[int, int]]]:
     """
     Instantiate MazeGenerator, generate the maze, write output file.
     """
     seed: Optional[int] = config.get("SEED")
 
+    # 1. Instantiate the generator exactly ONCE.
     generator = MazeGenerator(
         width=config["WIDTH"],
         height=config["HEIGHT"],
@@ -31,6 +34,12 @@ def build_maze(
     )
 
     grid: List[List[int]] = generator.generate()
+
+    # Extract the pattern cells directly from the instance.
+    # Note: Using your exact spelling 'patern_cells' from generator.py
+    # Converting the Set to a List so TerminalDisplay handles it easily
+    pattern_cells = generator._get_42_pattern_cells()
+
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
     output_file: str = config["OUTPUT_FILE"]
@@ -43,8 +52,7 @@ def build_maze(
     writer = HexWriter(maze, path, output_file)
     writer.write()
 
-    print(f"Maze written to '{output_file}'.")
-    return grid, path
+    return grid, path, pattern_cells
 
 
 def main() -> None:
@@ -58,6 +66,7 @@ def main() -> None:
 
     config_file: str = sys.argv[1]
 
+    # Parse and Validate Configuration safely
     try:
         raw_config = parse_config(config_file)
         config = validate_config(raw_config)
@@ -68,67 +77,64 @@ def main() -> None:
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
 
+    # Initial Maze Generation
     try:
-        grid, path = build_maze(config)
+        grid, path, pattern_cells = build_maze(config)
     except Exception as e:
         print(f"Generation error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    from src.mazegen.generator import MazeGenerator as _MG
-    _gen = _MG(width=config["WIDTH"], height=config["HEIGHT"])
-    pattern_cells = _gen.patern_cells
-
+    # Launch Display
     maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
-    test = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
+    display = TerminalDisplay(maze_obj, path, pattern_cells)
+    display.render()
 
-    test.render()
-    # test.main_menu()
-
+    # Interactive Loop
     try:
-            while True:
-                print("==A-Maze-ing==")
-                print("1. Re-generate a new maze")
-                print("2. Show/hide path from entry to exit")
-                print("3. Rotate maze colors")
-                print("4. Quit")
+        while True:
+            print("\n== A-Maze-ing ==")
+            print("1. Re-generate a new maze")
+            print("2. Show/hide path from entry to exit")
+            print("3. Rotate maze colors")
+            print("4. Quit")
 
-                choice = input("Choice (1-4): ")
+            choice_input = input("Choice (1-4): ")
 
-                try:
-                    choice = int(choice)
-                    if choice < 1 or choice > 4:
-                        print("Invalid input try again!")
-                        continue
-                except ValueError:
-                    print("Invalid input try again!")
+            try:
+                choice = int(choice_input)
+                if choice < 1 or choice > 4:
+                    print("Invalid input, try again!")
                     continue
-                if choice == 1:
-                    os.system('clear')
+            except ValueError:
+                print("Invalid input, try again!")
+                continue
 
+            if choice == 1:
+                os.system('clear')
+                try:
+                    # Cleanly rebuild everything without double-instantiation
+                    grid, path, pattern_cells = build_maze(config)
+                except Exception as e:
+                    print(f"Generation error: {e}", file=sys.stderr)
+                    continue  # Keep the app running even if a re-roll fails
 
-                    try:
-                        grid, path = build_maze(config)
-                    except Exception as e:
-                        print(f"Generation error: {e}", file=sys.stderr)
-                        sys.exit(1)
+                maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
+                display = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
+                display.render()
 
-                    from src.mazegen.generator import MazeGenerator as _MG
-                    _gen = _MG(width=config["WIDTH"], height=config["HEIGHT"])
-                    pattern_cells = _gen.patern_cells
+            elif choice == 2:
+                display.show_path()
+            elif choice == 3:
+                display.render(True)
+            elif choice == 4:
+                print("Goodbye!")
+                break
 
-                    maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
-                    test = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
-                    test.render()
+    # Graceful exit constraint
+    except KeyboardInterrupt:
+        print("\nExiting gracefully. Goodbye!", file=sys.stderr)
+        sys.exit(0)
 
-                elif choice == 2:
-                    test.show_path()
-                elif choice == 3:
-                    test.render(True)
-                elif choice == 4:
-                    print("Goodbye!")
-                    break
-    except BaseException:
-        pass
 
 if __name__ == "__main__":
     main()

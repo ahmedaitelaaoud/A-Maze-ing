@@ -46,7 +46,7 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, Any]:
         Dict[str, Any]: A clean dictionary with proper ints, tuples, and bools.
     """
     clean_settings = {}
-    mandatory_keys = ["WIDTH", "HEIGHT", "ENTRY", "EXIT", "SEED"]
+    mandatory_keys = ["WIDTH", "HEIGHT", "ENTRY", "EXIT"]
     # Check if all setting in
     for key in mandatory_keys:
         if key not in raw_settings:
@@ -64,6 +64,13 @@ def validate_config(raw_settings: Dict[str, str]) -> Dict[str, Any]:
             print(e)
             exit(1)
 
+    if "SEED" in raw_settings:
+        try:
+            clean_settings["SEED"] = int(raw_settings["SEED"])
+        except ValueError:
+            raise ValueError("Error: SEED must be a valid integer.")
+    else:
+        clean_settings["SEED"] = None
     # 2. Validate Coordinates
     try:
         # Split coordinates
