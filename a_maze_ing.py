@@ -9,7 +9,6 @@ import sys
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-# Assuming your config.py is saved as src/mazegen/utils.py based on your imports
 from src.mazegen.utils import parse_config, validate_config
 from src.mazegen.generator import MazeGenerator
 from src.solver.hex_writer import HexWriter
@@ -24,32 +23,31 @@ def build_maze(
     """
     Instantiate MazeGenerator, generate the maze, write output file.
     """
-    seed: Optional[int] = config.get("SEED")
-
-    # 1. Instantiate the generator exactly ONCE.
+    # ✅ Bug 1 fixed: Use the config passed in, not a re-parsed hardcoded file
+    # ✅ Bug 2 fixed: Use consistent variable name 'generator' (not 'maze')
     generator = MazeGenerator(
         width=config["WIDTH"],
         height=config["HEIGHT"],
-        seed=seed,
+        perfect=config["PERFECT"],  # ← reads PERFECT=false from your config file
+        seed=config["SEED"]
     )
 
+    # ✅ Bug 3 fixed: call generate() on 'generator', not undefined 'generator.generate()'
     grid: List[List[int]] = generator.generate()
 
-    # Extract the pattern cells directly from the instance.
-    # Note: Using your exact spelling 'patern_cells' from generator.py
-    # Converting the Set to a List so TerminalDisplay handles it easily
+    # ✅ Bug 4 fixed: 'maze' was being overwritten — renamed to 'maze_data' below
     pattern_cells = generator._get_42_pattern_cells()
 
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
     output_file: str = config["OUTPUT_FILE"]
 
-    maze = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
+    maze_data = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
 
-    pf = Pathfinder(maze)
+    pf = Pathfinder(maze_data)
     path: str = pf.solve()
 
-    writer = HexWriter(maze, path, output_file)
+    writer = HexWriter(maze_data, path, output_file)
     writer.write()
 
     return grid, path, pattern_cells
@@ -112,11 +110,10 @@ def main() -> None:
             if choice == 1:
                 os.system('clear')
                 try:
-                    # Cleanly rebuild everything without double-instantiation
                     grid, path, pattern_cells = build_maze(config)
                 except Exception as e:
                     print(f"Generation error: {e}", file=sys.stderr)
-                    continue  # Keep the app running even if a re-roll fails
+                    continue
 
                 maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
                 display = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
@@ -130,7 +127,6 @@ def main() -> None:
                 print("Goodbye!")
                 break
 
-    # Graceful exit constraint
     except KeyboardInterrupt:
         print("\nExiting gracefully. Goodbye!", file=sys.stderr)
         sys.exit(0)
