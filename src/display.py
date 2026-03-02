@@ -1,68 +1,192 @@
+"""
+display.py - Terminal display and interactive rendering of the maze.
+
+Place this file at: src/display.py
+"""
+
 import os
-import time
-import sys
-from typing import List, Optional, Tuple
-from src.solver.maze_data import MazeData
 import random
+import time
+from typing import List, Optional, Tuple
+
+from solver.maze_data import MazeData
 
 
 class TerminalDisplay:
+    """
+    Render a maze in the terminal using ANSI escape codes.
+
+    Supports animated wall drawing, colour cycling, highlighted '42'
+    pattern cells, and show/hide shortest path with animation.
+
+    Args:
+        maze: The MazeData to render.
+        path: Solution path string (N/E/S/W characters).
+        pattern_cells: List of (x, y) cells forming the '42' pattern.
+    """
+
     def __init__(
         self,
         maze: MazeData,
         path: Optional[str] = "",
-        pattern_cells: List[Tuple[int, int]] = None,
-    ):
-        self.maze = maze
-        self.path = path
-        self.pattern_cells = pattern_cells
+        pattern_cells: Optional[List[Tuple[int, int]]] = None,
+    ) -> None:
+        """
+        Initialise the display.
 
-        # ANSI Colors
+        Args:
+            maze: MazeData instance to render.
+            path: Solution path string.
+            pattern_cells: List of (x, y) tuples for the '42' pattern.
+        """
+        self.maze = maze
+        self.path: str = path if path is not None else ""
+        self.pattern_cells: List[Tuple[int, int]] = (
+            pattern_cells if pattern_cells is not None else []
+        )
+
         self.c_reset = "\033[0m"
-        self.bg_42_pass = "\033[104m"
+        self.bg_42 = "\033[104m"
 
         self.WALL = "██"
         self.EMPTY = "  "
         self.path_char = "\033[33m██\033[0m"
         self.START = "\033[32m██\033[0m"
-        self.EXIT = "\033[31m██\033[0m"
+        self.EXIT_CHAR = "\033[31m██\033[0m"
 
-        self.path_is_visible = False
+        self.path_visible: bool = False
 
-    def __random_color(self) -> tuple[str, str]:
-        """Generates random ANSI color codes for walls and the 42 pattern."""
-        number = random.randint(1, 4)
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
 
-        if number == 1:
-            return "\033[0;31m", "\033[106m"
-        elif number == 2:
-            return "\033[0;32m", "\033[105m"
-        elif number == 3:
-            return "\033[0;33m", "\033[103m"
-        else:
-            return "\033[0;34m", "\033[102m"
+    def _random_colors(self) -> Tuple[str, str]:
+        """
+        Return a randomly chosen (wall_color, bg_42) ANSI pair.
 
-    def render(self, color_operation = False) -> None:
+        Returns:
+            Tuple of two ANSI escape code strings.
+        """
+        palettes = [
+            ("\033[0;31m", "\033[106m"),
+            ("\033[0;32m", "\033[105m"),
+            ("\033[0;33m", "\033[103m"),
+            ("\033[0;34m", "\033[102m"),
+        ]
+        return random.choice(palettes)
+
+    def _draw_at(self, cx: int, cy: int, char: str) -> None:
+        """
+        Move the cursor to canvas position and print a character.
+
+        Args:
+            cx: Canvas column (converted to terminal column internally).
+            cy: Canvas row (converted to terminal row internally).
+            char: The string to print at that position.
+        """
+        tx = (cx * 2) + 1
+        ty = cy + 1
+        print(f"\033[{ty};{tx}H{char}", end="", flush=True)
+
+    def _draw_special_points(self) -> None:
+        """Draw entry (green) and exit (red) markers on the canvas."""
+        ex, ey = self.maze.entry
+        self._draw_at(ex * 3 + 1, ey * 3 + 1, self.START)
+
+        xx, xy = self.maze.exit
+        self._draw_at(xx * 3 + 1, xy * 3 + 1, self.EXIT_CHAR)
+
+    def _move_to_bottom(self) -> None:
+        """Move the cursor below the maze area."""
+        print(f"\033[{self.maze.height * 3 + 2};1H")
+
+    def _draw_path(
+        self, visible: bool, animate: bool = False
+    ) -> None:
+        """
+        Draw or erase the solution path on the current canvas.
+
+        Args:
+            visible: True to draw the path, False to erase it.
+            animate: True to add a small delay between each step.
+        """
+        if not self.path:
+            self._draw_special_points()
+            self._move_to_bottom()
+            return
+
+        char = self.path_char if visible else self.EMPTY
+        cx, cy = self.maze.entry
+
+        for direction in self.path:
+            sx, sy = cx * 3, cy * 3
+
+            if direction == "E":
+                self._draw_at(sx + 2, sy + 1, char)
+                self._draw_at(sx + 3, sy + 1, char)
+                cx += 1
+            elif direction == "S":
+                self._draw_at(sx + 1, sy + 2, char)
+                self._draw_at(sx + 1, sy + 3, char)
+                cy += 1
+            elif direction == "W":
+                if sx > 0:
+                    self._draw_at(sx, sy + 1, char)
+                if sx - 1 >= 0:
+                    self._draw_at(sx - 1, sy + 1, char)
+                cx -= 1
+            elif direction == "N":
+                if sy > 0:
+                    self._draw_at(sx + 1, sy, char)
+                if sy - 1 >= 0:
+                    self._draw_at(sx + 1, sy - 1, char)
+                cy -= 1
+
+            if (
+                (cx, cy) != self.maze.entry
+                and (cx, cy) != self.maze.exit
+            ):
+                self._draw_at(cx * 3 + 1, cy * 3 + 1, char)
+
+            if animate:
+                time.sleep(0.01)
+
+        self._draw_special_points()
+        self._move_to_bottom()
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def render(self, rotate_colors: bool = False) -> None:
+        """
+        Clear the screen and draw the entire maze.
+
+        Re-draws the path without toggling its state so colour rotation
+        does not accidentally hide a path the user has already revealed.
+
+        Args:
+            rotate_colors: If True, choose a random colour palette.
+        """
         try:
             print("\033[2J\033[H", end="", flush=True)
 
-            if color_operation:
-                wall_color, self.bg_42_pass = self.__random_color()
-
+            if rotate_colors:
+                wall_color, self.bg_42 = self._random_colors()
             else:
                 wall_color = "\033[37m"
-                self.bg_42_pass = "\033[104m"
-
+                self.bg_42 = "\033[104m"
 
             self.WALL = f"{wall_color}██{self.c_reset}"
 
             for y in range(self.maze.height):
-                for row_part in range(3):
+                for _ in range(3):
                     line = ""
                     for x in range(self.maze.width):
                         line += self.WALL * 3
                     print(line)
-            if (color_operation == False):
+
+            if not rotate_colors:
                 time.sleep(0.5)
 
             for y in range(self.maze.height):
@@ -71,86 +195,42 @@ class TerminalDisplay:
                     sx, sy = x * 3, y * 3
 
                     is_42 = (x, y) in self.pattern_cells
-                    p_char = f"{self.bg_42_pass}  {self.c_reset}" if is_42 else self.EMPTY
+                    p = (
+                        f"{self.bg_42}  {self.c_reset}"
+                        if is_42
+                        else self.EMPTY
+                    )
 
-                    self._draw_at_canvas(sx + 1, sy + 1, p_char)
+                    self._draw_at(sx + 1, sy + 1, p)
 
-                    if not (val & 2):
-                        self._draw_at_canvas(sx + 2, sy + 1, p_char)
-                        self._draw_at_canvas(sx + 3, sy + 1, p_char)
+                    if not (val & 2):        # East passage open
+                        self._draw_at(sx + 2, sy + 1, p)
+                        self._draw_at(sx + 3, sy + 1, p)
 
-                    if not (val & 4):
-                        self._draw_at_canvas(sx + 1, sy + 2, p_char)
-                        self._draw_at_canvas(sx + 1, sy + 3, p_char)
+                    if not (val & 4):        # South passage open
+                        self._draw_at(sx + 1, sy + 2, p)
+                        self._draw_at(sx + 1, sy + 3, p)
 
-                    if (color_operation == False):
+                    if not rotate_colors:
                         time.sleep(0.01)
 
             self._draw_special_points()
-            print(f"\033[{(self.maze.height * 3) + 2};1H")
-            if self.path_is_visible == True:
-                    self.show_path(True)
-        except BaseException:
-            os.system('clear')
-            print("Generation Corrupted!")
-            exit()
+            self._move_to_bottom()
 
-    def _draw_at_canvas(self, cx: int, cy: int, char: str) -> None:
-        tx = (cx * 2) + 1
-        ty = cy + 1
-        print(f"\033[{ty};{tx}H{char}", end="", flush=True)
+            # Re-draw path without flipping the toggle state
+            if self.path_visible:
+                self._draw_path(visible=True, animate=False)
 
-    def _draw_special_points(self) -> None:
-        ex, ey = self.maze.entry
-        bg_s = self.bg_42_pass if (ex, ey) in self.pattern_cells else ""
-        self._draw_at_canvas(
-            ex * 3 + 1, ey * 3 + 1, f"{bg_s}{self.START}{self.c_reset}"
-        )
+        except Exception:
+            os.system("clear")
+            print("Rendering error: could not display the maze.")
 
-        xx, xy = self.maze.exit
-        bg_e = self.bg_42_pass if (xx, xy) in self.pattern_cells else ""
-        self._draw_at_canvas(xx * 3 + 1, xy * 3 + 1, f"{bg_e}{self.EXIT}{self.c_reset}")
+    def show_path(self) -> None:
+        """
+        Toggle the shortest path visibility.
 
-    def show_path(self, flag=False):
-        if self.path:
-            if self.path_is_visible == False:
-                char_to_draw = self.path_char
-                self.path_is_visible = True
-            else:
-                char_to_draw = self.EMPTY
-                self.path_is_visible = False
-
-            cx, cy = self.maze.entry
-
-            if (cx, cy) != self.maze.entry and (cx, cy) != self.maze.exit:
-                self._draw_at_canvas(cx * 3 + 1, cy * 3 + 1, char_to_draw)
-
-            for direction in self.path:
-                sx, sy = cx * 3, cy * 3
-
-                if direction == "E":
-                    self._draw_at_canvas(sx + 2, sy + 1, char_to_draw)
-                    self._draw_at_canvas(sx + 3, sy + 1, char_to_draw)
-                    cx += 1
-                elif direction == "S":
-                    self._draw_at_canvas(sx + 1, sy + 2, char_to_draw)
-                    self._draw_at_canvas(sx + 1, sy + 3, char_to_draw)
-                    cy += 1
-                elif direction == "W":
-                    self._draw_at_canvas(sx, sy + 1, char_to_draw)
-                    self._draw_at_canvas(sx - 1, sy + 1, char_to_draw)
-                    cx -= 1
-                elif direction == "N":
-                    self._draw_at_canvas(sx + 1, sy, char_to_draw)
-                    self._draw_at_canvas(sx + 1, sy - 1, char_to_draw)
-                    cy -= 1
-
-                if flag == False:
-                    time.sleep(0.01)
-
-
-                if (cx, cy) != self.maze.entry and (cx, cy) != self.maze.exit:
-                    self._draw_at_canvas(cx * 3 + 1, cy * 3 + 1, char_to_draw)
-
-        self._draw_special_points()
-        print(f"\033[{(self.maze.height * 3) + 2};1H")
+        Alternates between showing and hiding the solution path without
+        affecting wall colours or the maze structure.
+        """
+        self.path_visible = not self.path_visible
+        self._draw_path(visible=self.path_visible, animate=True)

@@ -5,5 +5,5 @@ EXIT=19,14
 PERFECT=true
 OUTPUT_FILE=maze.txt
 ALGO=prim
-#ALGO=
-SEED=42
+#ALGO=DFS
+#SEED=42

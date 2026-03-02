@@ -1,80 +1,68 @@
 """
-Pathfinder module using Breadth-First Search (BFS).
-Guarantees the shortest path from entry to exit.
+pathfinder.py - BFS shortest-path solver for the maze.
+
+Place this file at: src/solver/pathfinder.py
 """
 
 from collections import deque
-from typing import Set, Tuple, Deque
-from src.solver.maze_data import MazeData
+from typing import Deque, Set, Tuple
+
+from .maze_data import MazeData
 
 
 class Pathfinder:
     """
-    Solves the maze using a BFS algorithm.
+    Find the shortest path from entry to exit using Breadth-First Search.
+
+    Args:
+        maze: A MazeData instance describing the maze.
     """
 
-    def __init__(self, maze: MazeData):
+    # (dx, dy, wall_bit_to_check, direction_letter)
+    _MOVES = [
+        (0, -1, 1, "N"),
+        (1, 0, 2, "E"),
+        (0, 1, 4, "S"),
+        (-1, 0, 8, "W"),
+    ]
+
+    def __init__(self, maze: MazeData) -> None:
         """
-        Initializes the Pathfinder with the read-only MazeData.
+        Initialize the Pathfinder.
+
+        Args:
+            maze: The maze to solve.
         """
         self.maze = maze
 
     def solve(self) -> str:
         """
-        Finds the shortest path from entry to exit using BFS.
+        Find the shortest path from entry to exit.
 
         Returns:
-            str: A string of directions (N, E, S, W) representing the path.
-                 Returns an empty string if no path exists.
+            A string of direction letters (N, E, S, W).
+            Returns an empty string if no path exists or entry == exit.
         """
-        # EDGE CASE: If entry and exit are the same room
         if self.maze.entry == self.maze.exit:
             return ""
 
-        # 1. THE QUEUE: Stores tuples of ((x, y), "path_taken_so_far")
-        queue: Deque[Tuple[Tuple[int, int], str]] = deque([(self.maze.entry, "")])
-
-        # 2. THE NOTEBOOK: Stores coordinates we have already visited
+        queue: Deque[Tuple[Tuple[int, int], str]] = deque(
+            [(self.maze.entry, "")]
+        )
         visited: Set[Tuple[int, int]] = {self.maze.entry}
 
-        # 3. THE COMPASS: (change_in_x, change_in_y, binary_wall_bit, letter)
-        # 1=North, 2=East, 4=South, 8=West
-        directions = [
-            (0, -1, 1, "N"),
-            (1, 0, 2, "E"),
-            (0, 1, 4, "S"),
-            (-1, 0, 8, "W")
-        ]
-
-        # 4. THE BFS LOOP
         while queue:
-            # Get the next person in line
-            (cx, cy), current_path = queue.popleft()
+            (cx, cy), path = queue.popleft()
+            walls = self.maze.get_walls(cx, cy)
 
-
-            # Ask the map for the walls in this specific room
-            current_walls = self.maze.get_walls(cx, cy)
-
-            # Check all 4 walls
-            for dx, dy, wall_bit, letter in directions:
-
-                # BITWISE MATH: If the result is 0, the door is OPEN
-                if (current_walls & wall_bit) == 0:
-
-                    # Calculate the coordinate of the next room
+            for dx, dy, wall_bit, letter in self._MOVES:
+                if (walls & wall_bit) == 0:
                     nx, ny = cx + dx, cy + dy
-
-                    # If we haven't visited this room yet
                     if (nx, ny) not in visited:
-                        new_path = current_path + letter
-
-                        # WIN CONDITION: Did we just step on the exit?
+                        new_path = path + letter
                         if (nx, ny) == self.maze.exit:
                             return new_path
-
-                        # Otherwise, write it in the notebook and get in line
                         visited.add((nx, ny))
                         queue.append(((nx, ny), new_path))
 
-        # 5. NO PATH FOUND
         return ""

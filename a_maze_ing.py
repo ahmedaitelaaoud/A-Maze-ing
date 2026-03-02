@@ -5,58 +5,72 @@ Usage:
     python3 a_maze_ing.py <config.txt>
 """
 
-import sys
 import os
-from typing import Any, Dict, List, Optional, Tuple
+import random
+import sys
+from typing import Any, Dict, List, Set, Tuple
 
-from src.mazegen.utils import parse_config, validate_config
-from src.mazegen.generator import MazeGenerator
-from src.solver.hex_writer import HexWriter
-from src.solver.maze_data import MazeData
-from src.solver.pathfinder import Pathfinder
-from src.display import TerminalDisplay
+# Make src/ importable without installing the package
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
+from mazegen.utils import parse_config, validate_config  # noqa: E402
+from mazegen.generator import MazeGenerator               # noqa: E402
+from solver.hex_writer import HexWriter                   # noqa: E402
+from solver.maze_data import MazeData                     # noqa: E402
+from solver.pathfinder import Pathfinder                  # noqa: E402
+from display import TerminalDisplay                       # noqa: E402
 
 
 def build_maze(
     config: Dict[str, Any],
-) -> Tuple[List[List[int]], str, List[Tuple[int, int]]]:
+) -> Tuple[List[List[int]], str, Set[Tuple[int, int]]]:
     """
-    Instantiate MazeGenerator, generate the maze, write output file.
+    Generate a maze from a validated config dict and write output file.
+
+    Args:
+        config: Validated configuration dictionary.
+
+    Returns:
+        A tuple of (grid, path_string, pattern_cells).
+
+    Raises:
+        ValueError: If ENTRY or EXIT fall on a pattern cell.
+        OSError: If the output file cannot be written.
     """
-    # ✅ Bug 1 fixed: Use the config passed in, not a re-parsed hardcoded file
-    # ✅ Bug 2 fixed: Use consistent variable name 'generator' (not 'maze')
-    generator = MazeGenerator(
+    gen = MazeGenerator(
         width=config["WIDTH"],
         height=config["HEIGHT"],
-        perfect=config["PERFECT"],  # ← reads PERFECT=false from your config file
+        perfect=config["PERFECT"],
         seed=config["SEED"],
-        algorithm=config["ALGO"]
+        algorithm=config["ALGO"],
     )
-    if config["ENTRY"] in generator.pattern_cells or config["EXIT"] in generator.pattern_cells:
-        raise ValueError("ENTRY or EXIT cannot be placed on a '42' pattern cell.")
-    # ✅ Bug 3 fixed: call generate() on 'generator', not undefined 'generator.generate()'
-    grid: List[List[int]] = generator.generate()
 
-    # FIXED: Access the public property, do NOT call the private _ method!
-    pattern_cells = generator.pattern_cells
+    if (
+        config["ENTRY"] in gen.pattern_cells
+        or config["EXIT"] in gen.pattern_cells
+    ):
+        raise ValueError(
+            "ENTRY or EXIT cannot be placed on a '42' pattern cell."
+        )
+
+    grid: List[List[int]] = gen.generate()
+    pattern_cells: Set[Tuple[int, int]] = gen.pattern_cells
 
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
-    output_file: str = config["OUTPUT_FILE"]
 
-    maze_data = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
+    maze_data = MazeData(
+        grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt
+    )
+    path: str = Pathfinder(maze_data).solve()
 
-    pf = Pathfinder(maze_data)
-    path: str = pf.solve()
-
-    writer = HexWriter(maze_data, path, output_file)
-    writer.write()
+    HexWriter(maze_data, path, config["OUTPUT_FILE"]).write()
 
     return grid, path, pattern_cells
 
 
 def main() -> None:
-    """Parse config, generate maze, write file, launch display."""
+    """Parse config, generate maze, write file, run interactive loop."""
     if len(sys.argv) != 2:
         print(
             "Usage: python3 a_maze_ing.py <config.txt>",
@@ -66,71 +80,86 @@ def main() -> None:
 
     config_file: str = sys.argv[1]
 
-    # Parse and Validate Configuration safely
     try:
         raw_config = parse_config(config_file)
         config = validate_config(raw_config)
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Config error: {e}", file=sys.stderr)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Config error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
 
-    # Initial Maze Generation
     try:
         grid, path, pattern_cells = build_maze(config)
-    except Exception as e:
-        print(f"Generation error: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Generation error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    # Launch Display
-    maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
-    display = TerminalDisplay(maze_obj, path, pattern_cells)
+    maze_obj = MazeData(
+        grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt
+    )
+    display = TerminalDisplay(maze_obj, path, list(pattern_cells))
     display.render()
 
-    # Interactive Loop
     try:
         while True:
-            print("\n== A-Maze-ing ==")
+            print("\n==== A-Maze-ing ====")
             print("1. Re-generate a new maze")
             print("2. Show/hide path from entry to exit")
             print("3. Rotate maze colors")
             print("4. Quit")
 
-            choice_input = input("Choice (1-4): ")
+            choice_raw = input("Choice (1-4): ").strip()
 
             try:
-                choice = int(choice_input)
-                if choice < 1 or choice > 4:
-                    print("Invalid input, try again!")
-                    continue
+                choice = int(choice_raw)
             except ValueError:
-                print("Invalid input, try again!")
+                print(
+                    "Invalid input, enter a number between 1 and 4."
+                )
+                continue
+
+            if choice < 1 or choice > 4:
+                print(
+                    "Invalid input, enter a number between 1 and 4."
+                )
                 continue
 
             if choice == 1:
-                os.system('clear')
+                os.system("clear")
+                regen_config = dict(config)
+                regen_config["SEED"] = random.randint(0, 2 ** 31)
                 try:
-                    grid, path, pattern_cells = build_maze(config)
-                except Exception as e:
-                    print(f"Generation error: {e}", file=sys.stderr)
+                    grid, path, pattern_cells = build_maze(
+                        regen_config
+                    )
+                except Exception as exc:
+                    print(
+                        f"Generation error: {exc}", file=sys.stderr
+                    )
                     continue
-
-                maze_obj = MazeData(grid, config["WIDTH"], config["HEIGHT"], entry, exit_pt)
-                display = TerminalDisplay(maze_obj, path, pattern_cells=pattern_cells)
+                maze_obj = MazeData(
+                    grid, config["WIDTH"], config["HEIGHT"],
+                    entry, exit_pt,
+                )
+                display = TerminalDisplay(
+                    maze_obj, path, list(pattern_cells)
+                )
                 display.render()
 
             elif choice == 2:
                 display.show_path()
+
             elif choice == 3:
-                display.render(True)
+                display.render(rotate_colors=True)
+
             elif choice == 4:
                 print("Goodbye!")
                 break
 
     except KeyboardInterrupt:
-        print("\nExiting gracefully. Goodbye!", file=sys.stderr)
+        print("\nExiting. Goodbye!", file=sys.stderr)
         sys.exit(0)
 
 
