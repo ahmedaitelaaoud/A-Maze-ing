@@ -51,15 +51,7 @@ class Pathfinder:
             # Get the next person in line
             (cx, cy), current_path = queue.popleft()
 
-#0011
-#
-#current_walls = 13
-#1101
-#
 
-# queue =1,1""SENS"
-# nx, ny =1,0 "SEN"
-#new_path ="SE"
             # Ask the map for the walls in this specific room
             current_walls = self.maze.get_walls(cx, cy)
 

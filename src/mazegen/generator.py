@@ -2,10 +2,6 @@ import random
 import sys
 from typing import Optional, List, Set, Tuple
 
-
-class test:
-    pass
-
 class MazeGenerator:
     """
     A reusable class for generating mazes.
@@ -13,14 +9,12 @@ class MazeGenerator:
     Set PERFECT=False for an imperfect maze (multiple paths / loops).
     """
 
-    # 1. Bitmask Constants (Power of 2)
     N = 1
     E = 2
     S = 4
     W = 8
-    ALL_WALLS = 15  # Binary 1111: all four walls are closed.
+    ALL_WALLS = 15
 
-    # GPS Dictionary: (dx, dy, opposite_wall)
     DIRECTIONS = {
         N: (0, -1, S),
         E: (1, 0, W),
@@ -28,24 +22,20 @@ class MazeGenerator:
         W: (-1, 0, E)
     }
 
-    # ── Config ──────────────────────────────────────────────────────────────
-    LOOP_FACTOR = 0.15   # % of extra walls removed when PERFECT=False
+    LOOP_FACTOR = 0.15
 
-    def __init__(self, width: int, height: int, perfect: bool = True, seed: Optional[int] = None):
+    def __init__(self, width: int, height: int, perfect: bool = True,
+                 algorithm: str = "DFS", seed: Optional[int] = None):
         self.width = width
         self.height = height
-        self.perfect = perfect    # ← stores it so generate() can read self.perfect
+        self.perfect = perfect
+        self.algorithm = algorithm.lower()
         self.seed = seed
         self.grid = [[self.ALL_WALLS for _ in range(width)] for _ in range(height)]
-        self.patern_cells = self._get_42_pattern_cells()
+        self.pattern_cells = self._get_42_pattern_cells()
 
     def _get_42_pattern_cells(self) -> Set[Tuple[int, int]]:
-        """
-        Calculates the coordinates of the '42' pattern to be placed in the center.
-
-        Returns:
-            set[tuple[int, int]]: A set of (x, y) coordinates representing the pattern.
-        """
+        """Calculates the coordinates of the '42' pattern."""
         pattern_cells: Set[Tuple[int, int]] = set()
 
         if self.width < 9 or self.height < 7:
@@ -61,37 +51,39 @@ class MazeGenerator:
         ]
 
         for dx, dy in pattern_offsets:
-            x, y = start_x + dx, start_y + dy
-            pattern_cells.add((x, y))
+            pattern_cells.add((start_x + dx, start_y + dy))
 
         return pattern_cells
 
     def generate(self) -> List[List[int]]:
         """
-        Carve a maze using the iterative Recursive Backtracker.
-        If PERFECT=False, extra walls are removed after generation to create loops.
+        Orchestrates maze generation based on the selected algorithm.
+        If PERFECT=False, extra walls are removed to create loops.
 
         Returns:
             list[list[int]]: The generated 2D grid containing wall bitmasks.
         """
-        if self.seed is not None:
-            random.seed(self.seed)
+        random.seed(self.seed)
 
-        visited: Set[Tuple[int, int]] = set(self.patern_cells)
+        if self.algorithm == "dfs" or self.algorithm == "backtracker":
+            self._generate_backtracker()
+        elif self.algorithm == "prim":
+            self._generate_prim()
+        else:
+            print(f"Error: Unknown algorithm '{self.algorithm}'. Defaulting to DFS.", file=sys.stderr)
+            self._generate_backtracker()
+
+        if not self.perfect:
+            self._add_loops()
+
+        return self.grid
+
+    def _generate_backtracker(self) -> None:
+        """Carves a maze using the iterative Recursive Backtracker algorithm."""
+        visited: Set[Tuple[int, int]] = set(self.pattern_cells)
         stack: List[Tuple[int, int]] = []
 
-        # Find the first non-pattern cell to start from
-        start_x, start_y = 0, 0
-        for y in range(self.height):
-            for x in range(self.width):
-                if (x, y) not in visited:
-                    start_x, start_y = x, y
-                    break
-            else:
-                continue
-            break
-
-        start = (start_x, start_y)
+        start = (0, 0)
         visited.add(start)
         stack.append(start)
 
@@ -107,7 +99,6 @@ class MazeGenerator:
 
             if unvisited:
                 wall, nx, ny, opp = random.choice(unvisited)
-                # Remove wall between current cell and chosen neighbor
                 self.grid[cy][cx] &= ~wall
                 self.grid[ny][nx] &= ~opp
                 visited.add((nx, ny))
@@ -115,98 +106,78 @@ class MazeGenerator:
             else:
                 stack.pop()
 
-        # ── If PERFECT=False, punch extra holes to create loops ──────────
-        if not self.perfect:
-            self._add_loops()
+    def _generate_prim(self) -> None:
+        """
+        Carves a maze using randomized Prim's algorithm.
+        Creates highly branched mazes with short dead ends.
+        """
+        visited: Set[Tuple[int, int]] = set(self.pattern_cells)
 
-        return self.grid
+        frontier: List[Tuple[int, int, int, int, int, int]] = []
+        def add_to_frontier(cx: int, cy: int) -> None:
+            """Finds unvisited neighbors of a cell and adds the connecting walls to the frontier."""
+            for wall, (dx, dy, opp) in self.DIRECTIONS.items():
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    if (nx, ny) not in visited:
+                        frontier.append((cx, cy, nx, ny, wall, opp))
 
-    # ────────────────────────────────────────────────────────────────────────
-    # HELPER: Check if two adjacent cells already have an open passage
-    # Uses the bitmask grid that your class already maintains
-    # ────────────────────────────────────────────────────────────────────────
+        start_x, start_y = 0, 0
+        visited.add((start_x, start_y))
+        add_to_frontier(start_x, start_y)
+
+        while frontier:
+            idx = random.randint(0, len(frontier) - 1)
+            cx, cy, nx, ny, wall, opp = frontier.pop(idx)
+
+            if (nx, ny) not in visited:
+
+                self.grid[cy][cx] &= ~wall
+                self.grid[ny][nx] &= ~opp
+
+                visited.add((nx, ny))
+                add_to_frontier(nx, ny)
+
     def _are_connected(self, x: int, y: int, nx: int, ny: int) -> bool:
-        """
-        Returns True if the wall between (x,y) and (nx,ny) is already removed.
-        Works by checking the bitmask of the current cell.
-
-        How it works:
-          - dx/dy tells us which direction the neighbor is in
-          - We find the matching wall bitmask (N/E/S/W)
-          - If that bit is 0 in self.grid[y][x], the wall is gone -> connected
-        """
+        """Returns True if the wall between (x,y) and (nx,ny) is already removed."""
         dx, dy = nx - x, ny - y
-        # Find which wall constant matches this direction
         for wall, (ddx, ddy, _) in self.DIRECTIONS.items():
             if ddx == dx and ddy == dy:
-                # Bit is 0 means wall was removed (passage exists)
                 return (self.grid[y][x] & wall) == 0
         return False
 
-    # ────────────────────────────────────────────────────────────────────────
-    # HELPER: Remove the wall between two adjacent cells (both sides)
-    # ────────────────────────────────────────────────────────────────────────
     def _remove_wall(self, x: int, y: int, nx: int, ny: int) -> None:
-        """
-        Opens the passage between (x,y) and (nx,ny) by clearing
-        the wall bit on BOTH sides (your bitmask grid requires this).
-
-        How it works:
-          - Find which wall bitmask matches the direction to the neighbor
-          - &= ~wall clears that bit in the current cell
-          - Do the same for the opposite wall in the neighbor cell
-        """
+        """Opens the passage between (x,y) and (nx,ny)."""
         dx, dy = nx - x, ny - y
         for wall, (ddx, ddy, opp) in self.DIRECTIONS.items():
             if ddx == dx and ddy == dy:
-                self.grid[y][x] &= ~wall   # Remove wall on current cell side
-                self.grid[ny][nx] &= ~opp  # Remove opposite wall on neighbor side
+                self.grid[y][x] &= ~wall
+                self.grid[ny][nx] &= ~opp
                 return
 
-    # ────────────────────────────────────────────────────────────────────────
-    # MAIN: Add loops to make the maze imperfect (PERFECT=False)
-    # ────────────────────────────────────────────────────────────────────────
     def _add_loops(self) -> None:
-        """
-        Randomly removes extra walls to create multiple paths (loops).
-        Only runs when PERFECT=False.
-
-        How it works:
-          1. Calculate how many extra passages to add (LOOP_FACTOR % of all cells)
-          2. Pick a random cell and a random neighbor direction
-          3. If they are NOT already connected -> remove the wall between them
-          4. Skip pattern cells (the '42' logo) so we don't break it
-          5. Repeat until we've added enough extra passages
-        """
+        """Randomly removes extra walls to create multiple paths (loops)."""
         extra_passages = int(self.width * self.height * self.LOOP_FACTOR)
-    # extra_passages = 90
         attempts = 0
         added = 0
 
         while added < extra_passages and attempts < extra_passages * 10:
             attempts += 1
-
-            # Pick a random cell
             x = random.randint(0, self.width - 1)
             y = random.randint(0, self.height - 1)
 
-            # Skip cells that are part of the '42' pattern
-            if (x, y) in self.patern_cells:
+            if (x, y) in self.pattern_cells:
                 continue
 
-            # Pick a random neighbor direction
             wall, (dx, dy, opp) = random.choice(list(self.DIRECTIONS.items()))
             nx, ny = x + dx, y + dy
 
-            # Check bounds
             if not (0 <= nx < self.width and 0 <= ny < self.height):
                 continue
 
-            # Skip if neighbor is part of the '42' pattern
-            if (nx, ny) in self.patern_cells:
+            if (nx, ny) in self.pattern_cells:
                 continue
 
-            # Only remove wall if it's still standing (avoid doing nothing)
             if not self._are_connected(x, y, nx, ny):
                 self._remove_wall(x, y, nx, ny)
                 added += 1

@@ -29,14 +29,16 @@ def build_maze(
         width=config["WIDTH"],
         height=config["HEIGHT"],
         perfect=config["PERFECT"],  # ← reads PERFECT=false from your config file
-        seed=config["SEED"]
+        seed=config["SEED"],
+        algorithm=config["ALGO"]
     )
-
+    if config["ENTRY"] in generator.pattern_cells or config["EXIT"] in generator.pattern_cells:
+        raise ValueError("ENTRY or EXIT cannot be placed on a '42' pattern cell.")
     # ✅ Bug 3 fixed: call generate() on 'generator', not undefined 'generator.generate()'
     grid: List[List[int]] = generator.generate()
 
-    # ✅ Bug 4 fixed: 'maze' was being overwritten — renamed to 'maze_data' below
-    pattern_cells = generator._get_42_pattern_cells()
+    # FIXED: Access the public property, do NOT call the private _ method!
+    pattern_cells = generator.pattern_cells
 
     entry: Tuple[int, int] = config["ENTRY"]
     exit_pt: Tuple[int, int] = config["EXIT"]
