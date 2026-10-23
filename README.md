@@ -1,281 +1,77 @@
-*This project has been created as part of the 42 curriculum by aait-ela, yrabhi.*
+# A-Maze-ing
 
----
+A Python maze generator and terminal visualizer combining iterative DFS or randomized Prim generation with BFS pathfinding.
 
-## Description
+*Created as part of the 42 curriculum by aait-ela and yrabhi.* This is a team learning project; the contribution breakdown and AI-use disclosure are preserved below.
 
-**A-Maze-ing** is a Python maze generator and terminal visualiser.
-It reads a plain-text configuration file, generates a maze using a
-chosen algorithm, embeds a hidden **"42" pattern** made of fully-walled
-cells, solves it with BFS, and renders everything interactively in the
-terminal with colour and animation.
+## Run locally
 
-Key features:
-
-- Two generation algorithms: **Recursive Backtracker (DFS)** and
-  **Randomised Prim's**.
-- Perfect maze mode (exactly one path between any two cells,
-  `PERFECT=True`) or imperfect mode (random loops, `PERFECT=False`).
-- BFS shortest-path solver — animated show/hide toggle.
-- Colour-cycling walls.
-- Hex output file with embedded entry, exit and solution path.
-- Reusable `mazegen` package installable with `pip`.
-
----
-
-## Instructions
-
-### Requirements
-
-- Python 3.10 or later
-- `flake8`, `mypy`, `build` (installed via `make install`)
-
-### Installation
+Python 3.10 or later is sufficient to run the terminal application.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ahmedaitelaaoud/A-Maze-ing.git
 cd A-Maze-ing
-make install
-```
-
-### Running
-
-```bash
-make run
-# or directly:
 python3 a_maze_ing.py default_config.txt
-python3 a_maze_ing.py my_config.txt
 ```
 
-### Interactive menu
+The menu regenerates the maze, toggles the solution, changes wall colors, or exits. The default run has been smoke-tested. Use a terminal with ANSI support and enough space for the selected dimensions.
 
-Once the maze is displayed, a menu appears:
+## Configuration
 
-```
-==== A-Maze-ing ====
-1. Re-generate a new maze
-2. Show/hide path from entry to exit
-3. Rotate maze colors
-4. Quit
-```
+| Key | Meaning |
+| --- | --- |
+| `WIDTH`, `HEIGHT` | Grid dimensions, at least 3 |
+| `ENTRY`, `EXIT` | Distinct coordinates written as `x,y` |
+| `PERFECT` | Whether generation should avoid added loops |
+| `OUTPUT_FILE` | Destination for the encoded maze and solution |
+| `ALGO` | Optional `dfs` or `prim` algorithm |
+| `SEED` | Optional integer for repeatable initial generation |
 
-### Lint and type-check
+See [default_config.txt](default_config.txt) for a working configuration. Interactive regeneration chooses a new seed. Entry and exit must not occupy the reserved “42” pattern.
+
+## Architecture and decisions
+
+| Module | Responsibility |
+| --- | --- |
+| `src/mazegen/generator.py` | Wall-bitmask grid, reserved pattern, DFS/Prim generation |
+| `src/mazegen/utils.py` | Configuration parsing and validation |
+| `src/solver/maze_data.py` | Grid and endpoint representation |
+| `src/solver/pathfinder.py` | BFS solution |
+| `src/solver/hex_writer.py` | Encoded file output |
+| `src/display.py` | Terminal rendering |
+| `a_maze_ing.py` | Application orchestration and menu |
+
+An explicit DFS stack avoids recursive call-depth limits. The “42” cells remain fully walled and are excluded from carving; statements about connectivity concern traversable cells, not those reserved cells. Imperfect mode adds loops with a check against fully open 3×3 areas.
+
+## Output format
+
+The output contains one hexadecimal wall mask per cell, followed by a blank line, entry coordinates, exit coordinates, and the solution as `N/E/S/W` directions. Bits 0–3 represent North, East, South, and West; a set bit means a closed wall.
+
+## Generator usage
+
+From the repository root:
 
 ```bash
-make lint          # flake8 + mypy (required flags)
-make lint-strict   # flake8 + mypy --strict
+PYTHONPATH=src python3 - <<'PYTHON'
+from mazegen.generator import MazeGenerator
+
+generator = MazeGenerator(width=20, height=15, perfect=True, seed=42)
+grid = generator.generate()
+print(len(grid), len(grid[0]))
+PYTHON
 ```
 
-### Build the reusable pip package
+Use the concrete module import above. The repository does not provide a package-level `MazeGenerator` export.
 
-```bash
-# Recommended: work inside a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install build
-python3 -m build
-# Produces:
-#   dist/mazegen-1.0.0-py3-none-any.whl
-#   dist/mazegen-1.0.0.tar.gz
-```
+## Development and limitations
 
-### Install the package in another project
+The Makefile provides `install`, `run`, `debug`, `lint`, `lint-strict`, `build`, `clean`, and `fclean` targets. Packaging is configured in `pyproject.toml`; package installation has not been verified as part of the portfolio review.
 
-```bash
-pip install dist/mazegen-1.0.0-py3-none-any.whl
-# or
-pip install dist/mazegen-1.0.0.tar.gz
-```
+There is no committed automated test suite. Useful next checks are connectivity across seeds, reciprocal walls, BFS solution validity, pattern overlap, and parser failures. Large mazes also warrant profiling of the Prim frontier and terminal renderer.
 
-### Other Makefile targets
+## License
 
-| Target | Description |
-|---|---|
-| `make run` | Run the program with the default config |
-| `make debug` | Run under the Python debugger (pdb) |
-| `make build` | Build the pip-installable package |
-| `make clean` | Remove caches and build artefacts |
-| `make fclean` | `clean` + remove generated `maze.txt` |
-| `make re` | `fclean` then `run` |
-
----
-
-## Configuration File
-
-The program accepts a single argument: a plain-text configuration file.
-
-**Format rules:**
-
-- One `KEY=VALUE` pair per line.
-- Lines starting with `#` are comments and are ignored.
-- The six keys below are **mandatory** — the program exits with a clear
-  error message if any is missing or malformed.
-
-| Key | Type | Description | Example |
-|---|---|---|---|
-| `WIDTH` | int ≥ 3 | Number of columns | `WIDTH=20` |
-| `HEIGHT` | int ≥ 3 | Number of rows | `HEIGHT=15` |
-| `ENTRY` | x,y | Entrance cell (0-indexed) | `ENTRY=0,0` |
-| `EXIT` | x,y | Exit cell (0-indexed) | `EXIT=19,14` |
-| `PERFECT` | bool | `True` = perfect maze | `PERFECT=True` |
-| `OUTPUT_FILE` | str | Path of the hex output file | `OUTPUT_FILE=maze.txt` |
-
-**Optional keys:**
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `SEED` | int | random | Seed for reproducible generation |
-| `ALGO` | str | `DFS` | Algorithm: `DFS` or `PRIM` |
-
-**Example file (`default_config.txt`):**
-
-```
-# A-Maze-ing default configuration
-
-WIDTH=20
-HEIGHT=15
-ENTRY=0,0
-EXIT=19,14
-PERFECT=True
-OUTPUT_FILE=maze.txt
-
-# Optional
-ALGO=prim
-SEED=42
-```
-
-**Error handling — the program catches and reports:**
-
-- Missing mandatory key
-- Line without `=` sign
-- Non-integer `WIDTH`, `HEIGHT`, or `SEED`
-- Non-boolean `PERFECT` value
-- `ENTRY` / `EXIT` out of maze bounds
-- `ENTRY` == `EXIT`
-- Unreadable or missing config file
-- Unwritable output file path
-
----
-
-## Output File Format
-
-After generation the maze is written to `OUTPUT_FILE`:
-
-```
-<HEIGHT rows of WIDTH uppercase hex digits>
-
-<entry_x>,<entry_y>
-<exit_x>,<exit_y>
-<shortest path as N/E/S/W characters>
-```
-
-Each hex digit encodes the closed walls of one cell as a 4-bit mask:
-
-| Bit | Direction |
-|---|---|
-| 0 (LSB) | North |
-| 1 | East |
-| 2 | South |
-| 3 | West |
-
-`1` = wall closed, `0` = wall open.
-Example: `A` (binary `1010`) means East and West walls are closed.
-
----
-
-## Maze Generation Algorithm
-
-### Choice: Iterative Recursive Backtracker (DFS)
-
-*(Randomised Prim's is also available via `ALGO=prim`.)*
-
-### Why Recursive Backtracker?
-
-1. **Perfect mazes guaranteed.** DFS visits every cell exactly once
-   and never creates cycles, producing a spanning tree — the
-   mathematical definition of a perfect maze with exactly one path
-   between any two cells.
-
-2. **Corridor width constraint met automatically.** The backtracker
-   carves exactly one-cell-wide corridors by design, so no 3×3 open
-   area can appear during the DFS phase. The constraint is also
-   enforced in the `_add_loops` step (`PERFECT=False`) via a
-   tentative-remove-and-rollback check.
-
-3. **Iterative avoids Python recursion limits.** A naive recursive DFS
-   would hit Python's default 1 000-call stack limit on large mazes.
-   Using an explicit `stack` list avoids `RecursionError` entirely.
-
-4. **Simple and auditable.** The algorithm is easy to explain and
-   verify step-by-step during peer evaluation.
-
-### The "42" pattern
-
-Before any carving begins, cells forming the digits "4" and "2" are
-pre-marked as visited. Both algorithms skip these cells, leaving them
-fully walled. They appear as a visible "42" shape in the rendered maze.
-If the maze is too small (width < 9 or height < 7) a warning is
-printed and the pattern is omitted.
-
----
-
-## Reusable `mazegen` Module
-
-The generation logic lives in `src/mazegen/` as a standalone Python
-package, fully independent of display and path-finding code.
-
-### Quick start
-
-```python
-from mazegen import MazeGenerator
-
-gen = MazeGenerator(width=20, height=15, perfect=True, seed=42)
-grid = gen.generate()
-# grid: list[list[int]] — wall bitmask per cell
-# Bit 0=North, 1=East, 2=South, 3=West  (1 = wall closed)
-
-pattern = gen.pattern_cells  # set of (x, y) tuples
-
-# Re-generate with a different seed
-gen.seed = 99
-grid2 = gen.generate()
-```
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `width` | int | — | Number of columns (≥ 3) |
-| `height` | int | — | Number of rows (≥ 3) |
-| `perfect` | bool | `True` | Perfect maze if True |
-| `algorithm` | str | `"dfs"` | `"dfs"` or `"prim"` |
-| `seed` | int \| None | `None` | Random seed |
-
-### Accessing a solution path
-
-The package exposes the grid only. Combine it with the solver:
-
-```python
-from mazegen import MazeGenerator
-from solver.maze_data import MazeData
-from solver.pathfinder import Pathfinder
-
-gen = MazeGenerator(20, 15, seed=42)
-grid = gen.generate()
-
-maze = MazeData(grid, 20, 15, entry=(0, 0), exit=(19, 14))
-path = Pathfinder(maze).solve()
-print(path)   # e.g. "EESSWWNEES..."
-```
-
-### Re-building from source
-
-```bash
-python3 -m venv venv && source venv/bin/activate
-pip install build
-python3 -m build
-# dist/mazegen-1.0.0-py3-none-any.whl
-```
+No repository-level LICENSE file is included. The packaging metadata contains an MIT classifier, but the licensing decision needs confirmation from the project authors.
 
 ---
 
@@ -366,3 +162,4 @@ team before inclusion.
 - **flake8** and **mypy** for linting and static type checking.
 - **Git** for version control and collaboration.
 - **Claude (Anthropic)** for code review (see AI usage section above).
+
